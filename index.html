@@ -178,11 +178,12 @@ var DATA = [
       "Program-manage HFC USE initiatives with Exco / COO-level governance."
     ],
     ach:[
+      "Led a team of 5 process analysts, owning all people management — leadership, performance management, mentoring and skill development.",
       "Delivered 7 robotic process automations, saving 5+ FTE per year.",
       "Drove HFC Node Health Score from 50.7% to 70.4% as Interim Program Director.",
       "HFC performance uplift: process maturity 1.7→3.0 in 10 weeks; ticket throughput 125→355/week; team 8→18; on-time SDP 21.9%→90%."
     ],
-    skills:["RPA / automation","Process maturity (BPE)","Signavio","Program management","Operating-model strategy"],
+    skills:["People leadership","RPA / automation","Process maturity (BPE)","Signavio","Program management","Operating-model strategy"],
     rel:"Hands-on automation delivery and process simplification — directly relevant to advancing AI & automation across P&C."
   },
   {
@@ -194,12 +195,13 @@ var DATA = [
       "Lead process and knowledge management across the pillar."
     ],
     ach:[
+      "Merged the 5-person process-analyst team with the reporting team into a single group of 8, owning all people leadership — performance management, mentoring and skill development.",
       "Scaled headline metrics from 20 to 250+, reported weekly to leadership.",
       "Built 24 L3 + 127 L4 processes and 80 work instructions in 3 months; uplifted maturity across all L3 processes.",
       "COVID response: stood up daily transit / HFC / capacity reporting in under a week, enabling a congestion-free customer experience.",
       "Rating: FY20 — Exceeds Expectations."
     ],
-    skills:["Data & analytics","Tableau / Alteryx","Telemetry data governance","Reporting automation","Executive metrics"],
+    skills:["People leadership","Data & analytics","Tableau / Alteryx","Telemetry data governance","Reporting automation","Executive metrics"],
     rel:"Building a reporting & analytics capability and data assets from scratch — the core of owning a P&C data & analytics strategy."
   },
   {
@@ -211,12 +213,13 @@ var DATA = [
       "Establish and coach a high-performing delivery team."
     ],
     ach:[
+      "Led a team of 7 data engineers and report builders (full-time + extended workforce), operating as a self-prioritising pod that built solutions for Operations.",
       "Delivered critical metrics (Red/Amber aged incidents, FME analytics) and external-KPI reporting for the Unify work-order contract.",
       "Matured triage, sizing and sprint prioritisation across Portfolio and Reporting teams.",
       "Rolled out hyper-care, enabling a reduction of 14 Tableau creator licences and retirement of 300+ low-usage reports.",
       "Rating: part of FY21 — Excellent Year."
     ],
-    skills:["Reporting leadership","Agile delivery","Stakeholder management","Cost / licence optimisation"],
+    skills:["People leadership","Reporting leadership","Agile delivery","Stakeholder management","Cost / licence optimisation"],
     rel:"Stand-up and adoption of reporting plus a self-serve model — mirrors driving rollout and adoption of a P&C One Model."
   },
   {
@@ -258,16 +261,22 @@ var DATA = [
     scope:"Embedding data, GenAI, Enterprise Knowledge Graph and automation into CNS operational transformation toward nbn’s 2030 vision.",
     resp:[
       "Establish the Insights-to-Actions strategy and prioritised use-case roadmap for CNS.",
+      "Act as Business Delivery Owner (BDO) for major programs and co-author the Operations Digital Strategy.",
       "Deliver priority AI / automation use cases and manage AI-risk governance.",
       "Engage executives and the CEO on EKG and digital strategy."
     ],
     ach:[
+      "Won a 2025 nbn award for accelerating Simple & Digital.",
+      "Acted as Business Delivery Owner (BDO) for two large programs with a combined CapEx budget of $7.2M.",
+      "Co-authored the Operations Digital Strategy and helped restructure the CNS portfolio.",
       "Delivered nbn’s first Enterprise Knowledge Graph proof of concept (FTTN RCD Reset, ~$450k/yr).",
       "Delivered the Appointment Summariser GenAI capability (~$30k/week cost avoidance) — first fully automated GenAI to a system of action.",
-      "Led the ACMA Phase 1 & 2 regulatory program across SEO, Regulatory and CNS; co-presented EKG use cases to the CEO.",
-      "Recognition: FY25 — 8 sparks and 1 award."
+      "Led the ACMA Phase 1 & 2 regulatory program across SEO, Regulatory and CNS — an end-to-end detection and ticket-lifecycle solution delivered across 8 drops.",
+      "Delivered the first of three phases uplifting Emergency Management Team (EMT) situational awareness.",
+      "Championed the CNS data teams — Data & Analytics Chapter showcases and two sessions with Chorus New Zealand on CNS/SEO AI collaboration.",
+      "Co-presented EKG use cases to the CEO; shaping Milliard and Agentic AI."
     ],
-    skills:["AI strategy","Enterprise Knowledge Graph","Agentic AI","Regulatory delivery (ACMA)","Executive influence"],
+    skills:["AI & automation strategy","Enterprise Knowledge Graph","Agentic AI","Program delivery (BDO)","CapEx accountability ($7.2M)","Regulatory delivery (ACMA)","Executive influence"],
     rel:"Live AI, automation and transformation leadership at enterprise scale — the leading edge of what P&C Digital Transformation needs."
   },
   {
@@ -292,7 +301,8 @@ var FACETS = ["Scope","Responsibilities","Achievements","Skills & Tools","Releva
 
 var graph=document.getElementById("graph"), svg=document.getElementById("paths"),
     spine=document.getElementById("spine"), connG=document.getElementById("connectors");
-var nodesEls=[], sats=[], coords=[], expanded=null, currentRole=null, currentFacet=0, revealed=false;
+var nodesEls=[], sats=[], coords=[], expanded=null, currentRole=null, currentFacet=0, revealed=false, panelOpen=false;
+var PANEL_INSET=560;
 
 function build(){
   DATA.forEach(function(d,i){
@@ -307,7 +317,8 @@ function layout(){
   var W=graph.clientWidth, H=graph.clientHeight, n=DATA.length;
   coords=[];
   if(W>760){
-    var padX=Math.max(90,W*0.08), usable=W-padX*2, midY=H*0.52, amp=Math.min(H*0.24,180);
+    var padX=Math.max(90,W*0.08), rightInset=(panelOpen?PANEL_INSET:0);
+    var usable=(W-rightInset)-padX*2, midY=H*0.52, amp=Math.min(H*0.24,180);
     for(var i=0;i<n;i++){
       var x=padX+usable*(i/(n-1));
       var y=midY+amp*Math.sin(i*0.95+0.3);
@@ -354,9 +365,10 @@ function reveal(){
   nodesEls.forEach(function(el,i){ setTimeout(function(){el.classList.add("show");}, 700+i*150); });
 }
 function onRole(i){
-  if(DATA[i].dest){ expand(i); openDetail(i,0); return; }
-  if(expanded===i){ openDetail(i,0); return; }
-  expand(i); openDetail(i,2);
+  if(expanded===i){ openDetail(i, DATA[i].dest?0:currentFacet); return; }
+  panelOpen=true; layout();
+  expand(i);
+  openDetail(i, DATA[i].dest?0:2);
 }
 function expand(i){
   expanded=i; currentRole=i;
@@ -390,6 +402,7 @@ function collapse(){
   expanded=null; clearSats();
   nodesEls.forEach(function(el){ el.classList.remove("dim","active"); });
   closeDetail();
+  panelOpen=false; layout();
 }
 function openDetail(i,facet){
   currentRole=i; currentFacet=facet; var d=DATA[i];
@@ -419,7 +432,7 @@ function renderFacet(){
 }
 function closeDetail(){ document.getElementById("detail").classList.remove("open"); }
 
-document.getElementById("detailClose").addEventListener("click",function(e){e.stopPropagation();closeDetail();});
+document.getElementById("detailClose").addEventListener("click",function(e){e.stopPropagation();collapse();});
 graph.addEventListener("click",function(){ collapse(); });
 document.getElementById("resetBtn").addEventListener("click",function(){ collapse(); document.getElementById("hintchip").style.opacity="1"; });
 document.getElementById("enterBtn").addEventListener("click",function(){ document.getElementById("intro").classList.add("hide"); if(!revealed) reveal(); });
