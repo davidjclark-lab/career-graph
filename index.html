@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>David Clark — Career Graph Explorer</title>
+<style>
+  :root{
+    --bg0:#05080f; --bg1:#0a1020; --line:#2dd4bf; --line2:#38bdf8;
+    --node:#0e7490; --nodeGlow:#22d3ee; --dest:#a78bfa; --destGlow:#c4b5fd;
+    --ink:#e8eef7; --muted:#88aacc; --muted2:#7d8da6; --card:#0d1426; --edge:#1e2c47;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:radial-gradient(1200px 800px at 70% -10%,#10203a 0%,var(--bg1) 45%,var(--bg0) 100%);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+  #topbar{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;z-index:40;pointer-events:none}
+  #brand{pointer-events:auto}
+  #brand .nm{font-weight:700;letter-spacing:.3px;font-size:16px}
+  #brand .sb{font-size:11.5px;color:var(--muted2);margin-top:1px}
+  .btns{display:flex;gap:8px;pointer-events:auto}
+  .btn{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);color:#bff3fb;font-size:12.5px;
+    padding:8px 13px;border-radius:9px;cursor:pointer;backdrop-filter:blur(6px);transition:all .2s}
+  .btn:hover{background:rgba(34,211,238,.18);border-color:rgba(34,211,238,.6)}
+  #graph{position:absolute;inset:0;z-index:10}
+  svg#paths{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .spine{fill:none;stroke:url(#grad);stroke-width:2.4;filter:drop-shadow(0 0 6px rgba(45,212,191,.55));
+    stroke-linecap:round}
+  .connector{fill:none;stroke:rgba(56,189,248,.55);stroke-width:1.6;stroke-dasharray:4 4}
+
+  .node{position:absolute;transform:translate(-50%,-50%);z-index:15;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;transition:opacity .45s,filter .45s;opacity:0}
+  .node .dot{width:21px;height:21px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#67e8f9,var(--node));
+    box-shadow:0 0 0 5px rgba(34,211,238,.10),0 0 18px 3px rgba(34,211,238,.55);transition:transform .25s,box-shadow .25s}
+  .node:hover .dot{transform:scale(1.18);box-shadow:0 0 0 7px rgba(34,211,238,.14),0 0 26px 5px rgba(34,211,238,.8)}
+  .node .lbl{margin-top:9px;text-align:center;max-width:150px}
+  .node .lbl .t{font-size:12.5px;font-weight:650;line-height:1.2}
+  .node .lbl .d{font-size:10.5px;color:var(--muted2);margin-top:2px}
+  .node.show{opacity:1}
+  .node.dim{opacity:.22;filter:blur(1.2px);pointer-events:none}
+  .node.active .dot{transform:scale(1.25);box-shadow:0 0 0 8px rgba(34,211,238,.18),0 0 34px 7px rgba(34,211,238,.9)}
+
+  .node.dest .dot{background:radial-gradient(circle at 35% 30%,#ddd6fe,var(--dest));
+    box-shadow:0 0 0 5px rgba(167,139,250,.14),0 0 22px 5px rgba(167,139,250,.65);animation:pulse 2.4s ease-in-out infinite}
+  .node.dest .lbl .t{color:#d8ccff}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 5px rgba(167,139,250,.12),0 0 18px 4px rgba(167,139,250,.5)}
+    50%{box-shadow:0 0 0 9px rgba(167,139,250,.2),0 0 32px 8px rgba(167,139,250,.95)}}
+
+  .sat{position:absolute;transform:translate(-50%,-50%) scale(.5);z-index:18;cursor:pointer;opacity:0;
+    transition:opacity .35s,transform .35s;display:flex;flex-direction:column;align-items:center}
+  .sat.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .sat .sdot{width:12px;height:12px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 12px 2px rgba(125,211,252,.7)}
+  .sat .stxt{margin-top:6px;font-size:11px;color:#cfe6f7;background:rgba(13,20,38,.82);border:1px solid var(--edge);
+    padding:3px 8px;border-radius:7px;white-space:nowrap}
+  .sat:hover .stxt{border-color:rgba(125,211,252,.7);color:#fff}
+
+  #detail{position:fixed;top:0;right:0;height:100%;width:min(430px,92vw);background:linear-gradient(180deg,#0c1426,#080d1a);
+    border-left:1px solid var(--edge);box-shadow:-20px 0 50px rgba(0,0,0,.5);z-index:50;
+    transform:translateX(110%);transition:transform .42s cubic-bezier(.22,1,.36,1);padding:64px 26px 30px;overflow-y:auto}
+  #detail.open{transform:translateX(0)}
+  #detail .close{position:absolute;top:18px;right:18px;width:32px;height:32px;border-radius:8px;border:1px solid var(--edge);
+    background:rgba(255,255,255,.04);color:#cdd8ea;cursor:pointer;font-size:16px;line-height:1}
+  #detail .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--line)}
+  #detail h2{margin:6px 0 2px;font-size:20px;line-height:1.25}
+  #detail .dates{font-size:12.5px;color:var(--muted2);margin-bottom:18px}
+  #detail .facet{font-size:12.5px;text-transform:uppercase;letter-spacing:1px;color:#7dd3fc;margin:0 0 12px}
+  #detail p{font-size:14px;line-height:1.6;color:#d3ddec}
+  #detail ul{margin:0;padding:0;list-style:none}
+  #detail li{font-size:13.5px;line-height:1.5;color:#d3ddec;padding:9px 0 9px 18px;position:relative;border-bottom:1px solid rgba(255,255,255,.05)}
+  #detail li:before{content:"";position:absolute;left:0;top:15px;width:7px;height:7px;border-radius:50%;
+    background:var(--line);box-shadow:0 0 8px rgba(45,212,191,.8)}
+  .tags{display:flex;flex-wrap:wrap;gap:8px}
+  .tag{font-size:12px;color:#bfeaff;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);padding:5px 11px;border-radius:20px}
+  .facetnav{display:flex;flex-wrap:wrap;gap:6px;margin-top:24px;border-top:1px solid var(--edge);padding-top:16px}
+  .fbtn{font-size:11.5px;color:#9fb2cc;background:transparent;border:1px solid var(--edge);padding:6px 10px;border-radius:7px;cursor:pointer;transition:all .2s}
+  .fbtn:hover{color:#fff;border-color:rgba(125,211,252,.6)}
+  .fbtn.cur{color:#06121f;background:#7dd3fc;border-color:#7dd3fc;font-weight:600}
+
+  #intro{position:fixed;inset:0;z-index:80;background:radial-gradient(900px 600px at 50% 30%,#101e36,#05080f 70%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;transition:opacity .6s}
+  #intro.hide{opacity:0;pointer-events:none}
+  #intro .glyph{font-size:34px;margin-bottom:8px}
+  #intro h1{font-size:clamp(26px,5vw,42px);margin:0 0 6px;font-weight:750;letter-spacing:.2px;
+    background:linear-gradient(90deg,#67e8f9,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #intro .sub{color:#9fb2cc;font-size:15px;max-width:520px;line-height:1.6}
+  #intro .hint{color:#6f819b;font-size:12.5px;margin-top:22px}
+  #intro .go{margin-top:26px}
+  #intro .go .btn{font-size:14px;padding:12px 26px}
+
+  #skills{position:fixed;inset:0;z-index:70;background:rgba(5,8,15,.86);backdrop-filter:blur(8px);
+    display:none;align-items:center;justify-content:center;padding:30px}
+  #skills.open{display:flex}
+  #skills .panel{background:#0c1426;border:1px solid var(--edge);border-radius:16px;max-width:760px;width:100%;
+    max-height:84vh;overflow-y:auto;padding:30px}
+  #skills h2{margin:0 0 4px;font-size:20px}
+  #skills .sub{color:var(--muted2);font-size:13px;margin-bottom:20px}
+  #skills .grp{margin-bottom:18px}
+  #skills .grp h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#7dd3fc;margin:0 0 10px}
+  .hintchip{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:35;font-size:12px;color:#7d8da6;
+    background:rgba(13,20,38,.7);border:1px solid var(--edge);padding:7px 14px;border-radius:20px;pointer-events:none;transition:opacity .4s}
+  @media (max-width:760px){
+    .node .lbl{max-width:120px}
+    #detail{width:100%;height:78%;top:auto;bottom:0;transform:translateY(110%);border-left:none;border-top:1px solid var(--edge);
+      border-radius:18px 18px 0 0}
+    #detail.open{transform:translateY(0)}
+  }
+</style>
+</head>
+<body>
+  <div id="topbar">
+    <div id="brand"><div class="nm">David Clark</div><div class="sb">Career Graph Explorer · NBN Journey</div></div>
+    <div class="btns">
+      <button class="btn" id="skillsBtn">Skills Overview</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div id="graph">
+    <svg id="paths"><defs>
+      <linearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#2dd4bf"/><stop offset="0.6" stop-color="#38bdf8"/><stop offset="1" stop-color="#a78bfa"/>
+      </linearGradient></defs>
+      <path id="spine" class="spine"/>
+      <g id="connectors"></g>
+    </svg>
+  </div>
+
+  <div class="hintchip" id="hintchip">Tap a role to explore · tap the background to collapse</div>
+
+  <aside id="detail">
+    <button class="close" id="detailClose">&times;</button>
+    <div class="eyebrow" id="dEyebrow"></div>
+    <h2 id="dTitle"></h2>
+    <div class="dates" id="dDates"></div>
+    <div class="facet" id="dFacet"></div>
+    <div id="dBody"></div>
+    <div class="facetnav" id="dNav"></div>
+  </aside>
+
+  <div id="skills"><div class="panel">
+    <h2>Skills &amp; Tools — across the journey</h2>
+    <div class="sub">Aggregated from every role on the graph.</div>
+    <div id="skillsBody"></div>
+  </div></div>
+
+  <div id="intro">
+    <div class="glyph">&#128302;</div>
+    <h1>The NBN Journey</h1>
+    <div class="sub">An explorable map of David Clark&rsquo;s career &mdash; from analyst to Executive Manager leading data, AI and operational transformation. Each node opens into scope, achievements, skills and how it maps to the next role.</div>
+    <div class="go"><button class="btn" id="enterBtn">Explore the graph &rarr;</button></div>
+    <div class="hint">Built as a live demonstration of AI-driven, interactive data visualisation.</div>
+  </div>
+
+<script>
+var DATA = [
+  {
+    id:"foundations", title:"Foundations: Analysis & Delivery", dates:"2000 – 2017",
+    scope:"Two decades of business analysis, project delivery and process consulting across Australia’s major telcos and the early years of nbn.",
+    resp:[
+      "Business and systems analysis on large telco transformation programs (billing, prepaid, provisioning).",
+      "Lead BA and team-leader roles across vendor and client delivery teams.",
+      "Process consulting and change management for enterprise rollouts."
+    ],
+    ach:[
+      "Delivered on major transformations at SingTel Optus, Telstra, Vodafone, ANZ and Jersey Telecom.",
+      "Progressed from Senior/Lead BA to Project Manager, building the analysis-to-delivery foundation for later EM roles.",
+      "At nbn (from 2011): authored versions of the WBA Operations Manual and documented requirements across FTTP, HFC and Satellite products."
+    ],
+    skills:["Business analysis","Requirements","Project management","Process design","Change management","Billing / Comverse systems"],
+    rel:"Deep delivery and requirements discipline — the bedrock for shaping and executing a P&C technology roadmap."
+  },
+  {
+    id:"bpe", title:"Process Enablement / HFC USE", dates:"Oct 2017 – Jan 2019",
+    scope:"Led a process and technical-writing team for HFC Network Operations, ran the HFC USE improvement program, and built an RPA practice. (Concurrent: Interim Program Director, HFC USE.)",
+    resp:[
+      "Drive strategic and operational improvement for HFC Network Operations.",
+      "Build and run the HFC Operations Robotic Process Automation practice.",
+      "Program-manage HFC USE initiatives with Exco / COO-level governance."
+    ],
+    ach:[
+      "Delivered 7 robotic process automations, saving 5+ FTE per year.",
+      "Drove HFC Node Health Score from 50.7% to 70.4% as Interim Program Director.",
+      "HFC performance uplift: process maturity 1.7→3.0 in 10 weeks; ticket throughput 125→355/week; team 8→18; on-time SDP 21.9%→90%."
+    ],
+    skills:["RPA / automation","Process maturity (BPE)","Signavio","Program management","Operating-model strategy"],
+    rel:"Hands-on automation delivery and process simplification — directly relevant to advancing AI & automation across P&C."
+  },
+  {
+    id:"bpa", title:"Mgr, Business Performance & Analytics", dates:"Jan 2019 – Nov 2020",
+    scope:"Built Network Engineering’s data, analytics, reporting and process capability from the ground up.",
+    resp:[
+      "Create and mature executive metrics, reporting and analytics for Network Engineering.",
+      "Own nbn telemetry datasets and represent the pillar in data governance.",
+      "Lead process and knowledge management across the pillar."
+    ],
+    ach:[
+      "Scaled headline metrics from 20 to 250+, reported weekly to leadership.",
+      "Built 24 L3 + 127 L4 processes and 80 work instructions in 3 months; uplifted maturity across all L3 processes.",
+      "COVID response: stood up daily transit / HFC / capacity reporting in under a week, enabling a congestion-free customer experience.",
+      "Rating: FY20 — Exceeds Expectations."
+    ],
+    skills:["Data & analytics","Tableau / Alteryx","Telemetry data governance","Reporting automation","Executive metrics"],
+    rel:"Building a reporting & analytics capability and data assets from scratch — the core of owning a P&C data & analytics strategy."
+  },
+  {
+    id:"era", title:"EM, Operations Reporting & Analytics", dates:"Nov 2020 – May 2021",
+    scope:"Led reporting & analytics delivery for the Operations pillar, forming one team from several groups during COVID.",
+    resp:[
+      "Plan and deliver reporting and data requirements across Operations.",
+      "Partner with business stakeholders on requirements and drivers.",
+      "Establish and coach a high-performing delivery team."
+    ],
+    ach:[
+      "Delivered critical metrics (Red/Amber aged incidents, FME analytics) and external-KPI reporting for the Unify work-order contract.",
+      "Matured triage, sizing and sprint prioritisation across Portfolio and Reporting teams.",
+      "Rolled out hyper-care, enabling a reduction of 14 Tableau creator licences and retirement of 300+ low-usage reports.",
+      "Rating: part of FY21 — Excellent Year."
+    ],
+    skills:["Reporting leadership","Agile delivery","Stakeholder management","Cost / licence optimisation"],
+    rel:"Stand-up and adoption of reporting plus a self-serve model — mirrors driving rollout and adoption of a P&C One Model."
+  },
+  {
+    id:"bpo", title:"EM, Business Portfolio — Operations", dates:"May 2021 – Aug 2023",
+    scope:"Ran the CDO data & analytics portfolio for the Operations business unit — prioritisation, governance and delivery.",
+    resp:[
+      "Own the Operations D&A portfolio, prioritisation and CDO engagement.",
+      "Lead data governance and management of Operations information assets.",
+      "Form and manage senior portfolio managers and analysts."
+    ],
+    ach:[
+      "Reduced CDO work backlog by 90%; open epics 55→27 and request wait time 22→20 days.",
+      "Built a prioritisation framework with the Operations data sponsor and a hub-and-spoke federated model for data access.",
+      "Brought all Operations licences into budget; acted as Service Owner for the DDE Migration analysis.",
+      "Rating: FY22 & FY23 — Excellent Year."
+    ],
+    skills:["Portfolio management","Prioritisation frameworks","Data governance","Federated operating model","Stakeholder leadership"],
+    rel:"Portfolio prioritisation, governance and value focus — the discipline behind a diverse P&C technology portfolio."
+  },
+  {
+    id:"dem", title:"EM, Demand Management", dates:"Sep 2023 – Oct 2024",
+    scope:"Owned the enterprise data & analytics use-case pipeline across all business units under nbn’s new Data Operating Model.",
+    resp:[
+      "Run the end-to-end use-case demand funnel; size impact and feasibility.",
+      "Partner with BU data strategy leads to identify priorities and use cases.",
+      "Shape, scope and govern delivery through Data Council."
+    ],
+    ach:[
+      "Use-case lead for ~$32m identified business benefits plus $8.6m of data-enabled benefits (FY24).",
+      "Delivered Fibre Connect (in 12 weeks), Movers ($130M addressable) and Ops Digital Enablement Ph1 ($3.56M) — nbn’s first productionised GenAI use case.",
+      "Re-engineered the Use Case Playbook adopted across CDO; created reusable data products.",
+      "Rating: FY24 — Successful Year."
+    ],
+    skills:["Demand management","Use-case shaping","GenAI delivery","Value driver trees","Data products","Data Council governance"],
+    rel:"Running a value-prioritised use-case pipeline and shaping data products — the exact shape of owning P&C’s data & AI agenda."
+  },
+  {
+    id:"io", title:"EM, Intelligent Operations", dates:"Nov 2024 – Present",
+    scope:"Embedding data, GenAI, Enterprise Knowledge Graph and automation into CNS operational transformation toward nbn’s 2030 vision.",
+    resp:[
+      "Establish the Insights-to-Actions strategy and prioritised use-case roadmap for CNS.",
+      "Deliver priority AI / automation use cases and manage AI-risk governance.",
+      "Engage executives and the CEO on EKG and digital strategy."
+    ],
+    ach:[
+      "Delivered nbn’s first Enterprise Knowledge Graph proof of concept (FTTN RCD Reset, ~$450k/yr).",
+      "Delivered the Appointment Summariser GenAI capability (~$30k/week cost avoidance) — first fully automated GenAI to a system of action.",
+      "Led the ACMA Phase 1 & 2 regulatory program across SEO, Regulatory and CNS; co-presented EKG use cases to the CEO.",
+      "Recognition: FY25 — 8 sparks and 1 award."
+    ],
+    skills:["AI strategy","Enterprise Knowledge Graph","Agentic AI","Regulatory delivery (ACMA)","Executive influence"],
+    rel:"Live AI, automation and transformation leadership at enterprise scale — the leading edge of what P&C Digital Transformation needs."
+  },
+  {
+    id:"dest", dest:true, title:"EM, P&C Digital Transformation", dates:"Target Role",
+    scope:"Lead nbn’s People & Culture digital transformation — the P&C tech roadmap, One Model adoption, data & analytics strategy, and AI/automation that improves the employee experience.",
+    resp:[
+      "Progress the P&C Tech roadmap with senior executives and enterprise stakeholders.",
+      "Own the P&C data & analytics strategy, reporting and data products; accountable for data governance, privacy and compliance.",
+      "Advance AI and automation across P&C and lead a high-performing delivery team."
+    ],
+    ach:[
+      "Owns data & analytics strategy end-to-end and a value-prioritised use-case pipeline (~$32m identified benefits).",
+      "Delivered nbn’s first productionised GenAI and first EKG PoC — practical AI that simplifies processes.",
+      "Built reporting, dashboards and self-serve adoption models (echoing the P&C One Model).",
+      "Direct People & Culture credibility as nbn Pride co-chair — DEI strategy, engagement and AWEI accreditation."
+    ],
+    skills:["Digital transformation strategy","Data & AI roadmap","Governance & compliance","Adoption & change","Executive influence","People & Culture domain"],
+    rel:"Every prior node feeds this one: strategy ownership, AI/automation delivery, adoption, governance and genuine P&C-domain credibility."
+  }
+];
+var FACETS = ["Scope","Responsibilities","Achievements","Skills & Tools","Relevance to Target Role"];
+
+var graph=document.getElementById("graph"), svg=document.getElementById("paths"),
+    spine=document.getElementById("spine"), connG=document.getElementById("connectors");
+var nodesEls=[], sats=[], coords=[], expanded=null, currentRole=null, currentFacet=0, revealed=false;
+
+function build(){
+  DATA.forEach(function(d,i){
+    var el=document.createElement("div");
+    el.className="node"+(d.dest?" dest":"");
+    el.innerHTML='<div class="dot"></div><div class="lbl"><div class="t">'+d.title+'</div><div class="d">'+d.dates+'</div></div>';
+    el.addEventListener("click",function(e){e.stopPropagation();onRole(i);});
+    graph.appendChild(el); nodesEls.push(el);
+  });
+}
+function layout(){
+  var W=graph.clientWidth, H=graph.clientHeight, n=DATA.length;
+  coords=[];
+  if(W>760){
+    var padX=Math.max(90,W*0.08), usable=W-padX*2, midY=H*0.52, amp=Math.min(H*0.24,180);
+    for(var i=0;i<n;i++){
+      var x=padX+usable*(i/(n-1));
+      var y=midY+amp*Math.sin(i*0.95+0.3);
+      coords.push({x:x,y:y});
+    }
+  } else {
+    var padY=130, usableY=H-padY-90, midX=W*0.5, ampX=Math.min(W*0.28,130);
+    for(var j=0;j<n;j++){
+      var yy=padY+usableY*(j/(n-1));
+      var xx=midX+ampX*Math.sin(j*1.0);
+      coords.push({x:xx,y:yy});
+    }
+  }
+  for(var k=0;k<nodesEls.length;k++){nodesEls[k].style.left=coords[k].x+"px";nodesEls[k].style.top=coords[k].y+"px";}
+  drawSpine();
+  if(expanded!==null) positionSats();
+}
+function smoothPath(pts){
+  if(pts.length<2) return "";
+  var d="M"+pts[0].x+","+pts[0].y;
+  for(var i=0;i<pts.length-1;i++){
+    var p0=pts[i>0?i-1:0], p1=pts[i], p2=pts[i+1], p3=pts[i+2<pts.length?i+2:i+1];
+    var c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6;
+    var c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
+    d+="C"+c1x+","+c1y+" "+c2x+","+c2y+" "+p2.x+","+p2.y;
+  }
+  return d;
+}
+function drawSpine(animate){
+  spine.setAttribute("d",smoothPath(coords));
+  var len=spine.getTotalLength();
+  if(animate){
+    spine.style.transition="none";
+    spine.style.strokeDasharray=len; spine.style.strokeDashoffset=len;
+    spine.getBoundingClientRect();
+    spine.style.transition="stroke-dashoffset 1.8s ease";
+    spine.style.strokeDashoffset=0;
+  } else {
+    spine.style.strokeDasharray="none"; spine.style.strokeDashoffset=0;
+  }
+}
+function reveal(){
+  revealed=true; drawSpine(true);
+  nodesEls.forEach(function(el,i){ setTimeout(function(){el.classList.add("show");}, 700+i*150); });
+}
+function onRole(i){
+  if(DATA[i].dest){ expand(i); openDetail(i,0); return; }
+  if(expanded===i){ openDetail(i,0); return; }
+  expand(i); openDetail(i,2);
+}
+function expand(i){
+  expanded=i; currentRole=i;
+  nodesEls.forEach(function(el,k){ el.classList.toggle("dim",k!==i); el.classList.toggle("active",k===i); });
+  clearSats();
+  var c=coords[i], W=graph.clientWidth;
+  var R=W>760?125:96;
+  var baseAng=c.y<graph.clientHeight*0.5? Math.PI*0.5 : -Math.PI*0.5;
+  var spread=Math.PI*1.25, start=-spread/2;
+  for(var f=0;f<FACETS.length;f++){
+    var ang=baseAng+start+spread*(f/(FACETS.length-1));
+    var sx=c.x+R*Math.cos(ang), sy=c.y+R*Math.sin(ang);
+    var s=document.createElement("div"); s.className="sat";
+    s.style.left=sx+"px"; s.style.top=sy+"px";
+    var label=DATA[i].dest? ["The Mandate","What It Needs","Proof Points","Capabilities","The Through-Line"][f] : FACETS[f];
+    s.innerHTML='<div class="sdot"></div><div class="stxt">'+label+'</div>';
+    (function(idx,fi){ s.addEventListener("click",function(e){e.stopPropagation();openDetail(idx,fi);}); })(i,f);
+    graph.appendChild(s); sats.push(s);
+    var ln=document.createElementNS("http://www.w3.org/2000/svg","path");
+    ln.setAttribute("class","connector"); ln.setAttribute("d","M"+c.x+","+c.y+" L"+sx+","+sy);
+    connG.appendChild(ln);
+    (function(node){ setTimeout(function(){node.classList.add("show");},40+f*60); })(s);
+  }
+  document.getElementById("hintchip").style.opacity="0";
+}
+function positionSats(){
+  if(expanded===null) return; var i=expanded; expand(i);
+}
+function clearSats(){ sats.forEach(function(s){s.remove();}); sats=[]; while(connG.firstChild)connG.removeChild(connG.firstChild); }
+function collapse(){
+  expanded=null; clearSats();
+  nodesEls.forEach(function(el){ el.classList.remove("dim","active"); });
+  closeDetail();
+}
+function openDetail(i,facet){
+  currentRole=i; currentFacet=facet; var d=DATA[i];
+  document.getElementById("dEyebrow").textContent=d.dest?"Target Role":"NBN Role";
+  document.getElementById("dTitle").textContent=d.title;
+  document.getElementById("dDates").textContent=d.dates;
+  renderFacet();
+  var nav=document.getElementById("dNav"); nav.innerHTML="";
+  var labels=d.dest?["The Mandate","What It Needs","Proof Points","Capabilities","The Through-Line"]:FACETS;
+  labels.forEach(function(lb,fi){
+    var b=document.createElement("button"); b.className="fbtn"+(fi===facet?" cur":""); b.textContent=lb;
+    b.addEventListener("click",function(){currentFacet=fi;openDetail(i,fi);}); nav.appendChild(b);
+  });
+  document.getElementById("detail").classList.add("open");
+}
+function renderFacet(){
+  var d=DATA[currentRole], f=currentFacet, body=document.getElementById("dBody");
+  var labels=d.dest?["The Mandate","What It Needs","Proof Points","Capabilities","The Through-Line"]:FACETS;
+  document.getElementById("dFacet").textContent=labels[f];
+  var html="";
+  if(f===0){ html='<p>'+d.scope+'</p>'; }
+  else if(f===1){ html="<ul>"+d.resp.map(function(x){return "<li>"+x+"</li>";}).join("")+"</ul>"; }
+  else if(f===2){ html="<ul>"+d.ach.map(function(x){return "<li>"+x+"</li>";}).join("")+"</ul>"; }
+  else if(f===3){ html='<div class="tags">'+d.skills.map(function(x){return '<span class="tag">'+x+'</span>';}).join("")+'</div>'; }
+  else { html='<p>'+d.rel+'</p>'; }
+  body.innerHTML=html;
+}
+function closeDetail(){ document.getElementById("detail").classList.remove("open"); }
+
+document.getElementById("detailClose").addEventListener("click",function(e){e.stopPropagation();closeDetail();});
+graph.addEventListener("click",function(){ collapse(); });
+document.getElementById("resetBtn").addEventListener("click",function(){ collapse(); document.getElementById("hintchip").style.opacity="1"; });
+document.getElementById("enterBtn").addEventListener("click",function(){ document.getElementById("intro").classList.add("hide"); if(!revealed) reveal(); });
+
+document.getElementById("skillsBtn").addEventListener("click",function(){
+  var groups={}; DATA.forEach(function(d){ if(d.dest)return; d.skills.forEach(function(s){ groups[s]=(groups[s]||0)+1; }); });
+  var all=Object.keys(groups);
+  var body=document.getElementById("skillsBody");
+  body.innerHTML='<div class="grp"><h3>'+all.length+' distinct skills & tools across 7 roles</h3><div class="tags">'+
+    all.map(function(s){return '<span class="tag">'+s+'</span>';}).join("")+'</div></div>';
+  document.getElementById("skills").classList.add("open");
+});
+document.getElementById("skills").addEventListener("click",function(e){ if(e.target.id==="skills") this.classList.remove("open"); });
+
+window.addEventListener("resize",layout);
+build(); layout();
+</script>
+</body>
+</html>
